@@ -4,11 +4,11 @@ import os, socket, sys, stat
 
 VALIDATION = os.getenv("CERTBOT_VALIDATION", None)
 TOKEN = os.getenv("CERTBOT_TOKEN", None)
-if VALIDATION == None or TOKEN == None :
+if VALIDATION is None or TOKEN is None:
 	sys.exit(1)
 
-try :
-	with open("/opt/bunkerized-nginx/acme-challenge/.well-known/acme-challenge/" + TOKEN, "w") as f :
+try:
+	with open(f"/opt/bunkerized-nginx/acme-challenge/.well-known/acme-challenge/{TOKEN}", "w") as f:
 		f.write(VALIDATION)
 except :
 	sys.exit(2)

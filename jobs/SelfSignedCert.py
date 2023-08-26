@@ -12,9 +12,17 @@ class SelfSignedCert(Job) :
 		self.__dst_key = dst_key
 		super().__init__(name, data, filename=None, redis_host=redis_host, type=type, copy_cache=copy_cache)
 
-	def _callback(self, success) :
-		if success :
-			log("self-signed-cert", "INFO", "generated certificate " + self.__dst_cert + " with private key " + self.__dst_key)
-		else :
-			log("self-signed-cert", "ERROR", "can't generate certificate " + self.__dst_cert + " with private key " + self.__dst_key)
+	def _callback(self, success):
+		if success:
+			log(
+				"self-signed-cert",
+				"INFO",
+				f"generated certificate {self.__dst_cert} with private key {self.__dst_key}",
+			)
+		else:
+			log(
+				"self-signed-cert",
+				"ERROR",
+				f"can't generate certificate {self.__dst_cert} with private key {self.__dst_key}",
+			)
 

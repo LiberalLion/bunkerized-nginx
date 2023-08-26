@@ -6,7 +6,7 @@ import utils
 from Configurator import Configurator
 from Templator import Templator
 
-if __name__ == "__main__" :
+if __name__ == "__main__":
 
 	# Parse arguments
 	parser = argparse.ArgumentParser(description="bunkerized-nginx config generator v1.0")
@@ -18,29 +18,29 @@ if __name__ == "__main__" :
 	args = parser.parse_args()
 
 	# Check existences and permissions
-	if not os.path.exists(args.settings) :
-		print("[!] Missing settings file : " + args.settings)
+	if not os.path.exists(args.settings):
+		print(f"[!] Missing settings file : {args.settings}")
 		sys.exit(1)
-	if not os.access(args.settings, os.R_OK) :
-		print("[!] Can't read settings file : " + args.settings)
+	if not os.access(args.settings, os.R_OK):
+		print(f"[!] Can't read settings file : {args.settings}")
 		sys.exit(2)
-	if not os.path.isdir(args.templates) :
-		print("[!] Missing templates directory : " + args.templates)
+	if not os.path.isdir(args.templates):
+		print(f"[!] Missing templates directory : {args.templates}")
 		sys.exit(1)
-	if not os.access(args.templates, os.R_OK | os.X_OK) :
-		print("[!] Can't read the templates directory : " + args.templates)
+	if not os.access(args.templates, os.R_OK | os.X_OK):
+		print(f"[!] Can't read the templates directory : {args.templates}")
 		sys.exit(2)
-	if not os.path.isdir(args.output) :
-		print("[!] Missing output directory : " + args.output)
+	if not os.path.isdir(args.output):
+		print(f"[!] Missing output directory : {args.output}")
 		sys.exit(1)
-	if not os.access(args.output, os.W_OK | os.X_OK) :
-		print("[!] Can't write to the templates directory : " + args.output)
+	if not os.access(args.output, os.W_OK | os.X_OK):
+		print(f"[!] Can't write to the templates directory : {args.output}")
 		sys.exit(2)
-	if not os.path.exists(args.variables) :
-		print("[!] Missing variables file : " + args.variables)
+	if not os.path.exists(args.variables):
+		print(f"[!] Missing variables file : {args.variables}")
 		sys.exit(1)
-	if not os.access(args.variables, os.R_OK) :
-		print("[!] Can't read variables file : " + args.variables)
+	if not os.access(args.variables, os.R_OK):
+		print(f"[!] Can't read variables file : {args.variables}")
 		sys.exit(2)
 
 	# Compute the final config
@@ -51,7 +51,7 @@ if __name__ == "__main__" :
 	config = configurator.get_config()
 
 	# Remove old files
-	files = glob.glob(args.output + "/*")
+	files = glob.glob(f"{args.output}/*")
 	for file in files :
 		if (file.endswith(".conf") or file.endswith(".env")) and os.path.isfile(file) and not os.path.islink(file) :
 			os.remove(file)
@@ -61,18 +61,18 @@ if __name__ == "__main__" :
 	# Generate the files from templates and config
 	templator = Templator(config, args.templates, args.output, args.target)
 	templator.render_global()
-	if config["MULTISITE"] == "no" :
+	if config["MULTISITE"] == "no":
 		templator.render_site()
-	elif config["SERVER_NAME"] != "" :
-		# Compute a dict of first_server: [list of server_name]
-		map_servers = {}
-		for server_name in config["SERVER_NAME"].split(" ") :
-			if server_name + "_SERVER_NAME" in config :
-				map_servers[server_name] = config[server_name + "_SERVER_NAME"].split(" ")
-		for server_name in config["SERVER_NAME"].split(" ") :
+	elif config["SERVER_NAME"] != "":
+		map_servers = {
+			server_name: config[f"{server_name}_SERVER_NAME"].split(" ")
+			for server_name in config["SERVER_NAME"].split(" ")
+			if f"{server_name}_SERVER_NAME" in config
+		}
+		for server_name in config["SERVER_NAME"].split(" "):
 			if server_name in map_servers :
 				continue
-			for first_server, servers in map_servers.items() :
+			for servers in map_servers.values():
 				if server_name in servers :
 					continue
 			map_servers[server_name] = [server_name]

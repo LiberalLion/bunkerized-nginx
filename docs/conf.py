@@ -28,14 +28,15 @@ def get_git_branch():
         # or something like "* MYBRANCH"
         branch_output = p.communicate()[0].decode("ascii")
 
-        # This is if git is in a normal branch state
-        match = re.search(r'\* (?P<branch_name>[^\(\)\n ]+)', branch_output)
-        if match:
+        if match := re.search(
+            r'\* (?P<branch_name>[^\(\)\n ]+)', branch_output
+        ):
             return match.groupdict()['branch_name']
 
-        # git is in a detached HEAD state
-        match = re.search(r'\(HEAD detached at origin/(?P<branch_name>[^\)]+)\)', branch_output)
-        if match:
+        if match := re.search(
+            r'\(HEAD detached at origin/(?P<branch_name>[^\)]+)\)',
+            branch_output,
+        ):
             return match.groupdict()['branch_name']
     except Exception as e :
         print(e)

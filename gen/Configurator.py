@@ -6,31 +6,29 @@ class Configurator :
 		self.__settings = {}
 		self.__variables = {}
 
-	def load_settings(self, path) :
+	def load_settings(self, path):
 		with open(path, "r") as f :
 			data = json.loads(f.read())
-		for cat in data :
-			for param in data[cat]["params"] :
-				if param["type"] == "multiple" :
-					real_params = param["params"]
-				else :
-					real_params = [param]
+		for cat in data:
+			for param in data[cat]["params"]:
+				real_params = param["params"] if param["type"] == "multiple" else [param]
 				for real_param in real_params :
 					self.__settings[real_param["env"]] = real_param
 					self.__settings[real_param["env"]]["category"] = cat
 
-	def load_variables(self, vars, multisite_only=False) :
-		for var, value in vars.items() :
+	def load_variables(self, vars, multisite_only=False):
+		for var, value in vars.items():
 			check, reason = self.__check_var(var, value)
-			if check :
+			if check:
 				self.__variables[var] = value
-			else :
-				print("ignoring " + var + "=" + value + " (" + reason + ")", file=sys.stderr)
+			else:
+				print(f"ignoring {var}={value} ({reason})", file=sys.stderr)
 
-	def get_config(self) :
-		config = {}
-		for setting in self.__settings :
-			config[setting] = self.__settings[setting]["default"]
+	def get_config(self):
+		config = {
+			setting: self.__settings[setting]["default"]
+			for setting in self.__settings
+		}
 		for variable, value in self.__variables.items() :
 			config[variable] = value
 		return config

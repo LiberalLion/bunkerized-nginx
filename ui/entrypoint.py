@@ -75,93 +75,104 @@ def logout() :
 @app.route('/')
 @app.route('/home')
 @login_required
-def home() :
-	try :
-		instances_number = len(app.config["INSTANCES"].get_instances())
-		services_number = len(app.config["CONFIG"].get_services())
-		return render_template("home.html", title="Home", instances_number=instances_number, services_number=services_number)
-	except Exception as e :
-		return render_template("error.html", title="Error", error=str(e) + "<br />" + traceback.format_exc().replace("\n", "<br />"))
+def home():
+    try:
+        instances_number = len(app.config["INSTANCES"].get_instances())
+        services_number = len(app.config["CONFIG"].get_services())
+        return render_template("home.html", title="Home", instances_number=instances_number, services_number=services_number)
+    except Exception as e:
+        return render_template(
+            "error.html",
+            title="Error",
+            error=f"{str(e)}<br />"
+            + traceback.format_exc().replace("\n", "<br />"),
+        )
 
 @app.route('/instances', methods=["GET", "POST"])
 @login_required
-def instances() :
-	try :
-		# Manage instances
-		operation = ""
-		if request.method == "POST" :
+def instances():
+    try:
+        # Manage instances
+        operation = ""
+        if request.method == "POST":
 
-			# Check operation
-			if not "operation" in request.form or not request.form["operation"] in ["reload", "start", "stop", "restart"] :
-				raise Exception("Missing operation parameter on /instances.")
+            			# Check operation
+            if "operation" not in request.form or request.form[
+                "operation"
+            ] not in ["reload", "start", "stop", "restart"]:
+                raise Exception("Missing operation parameter on /instances.")
 
-			# Check that all fields are present
-			if not "INSTANCE_ID" in request.form :
-				raise Exception("Missing INSTANCE_ID parameter.")
+            			# Check that all fields are present
+            if "INSTANCE_ID" not in request.form:
+                raise Exception("Missing INSTANCE_ID parameter.")
 
-			# Do the operation
-			if request.form["operation"] == "reload" :
-				operation = app.config["INSTANCES"].reload_instance(request.form["INSTANCE_ID"])
-			elif request.form["operation"] == "start" :
-				operation = app.config["INSTANCES"].start_instance(request.form["INSTANCE_ID"])
-			elif request.form["operation"] == "stop" :
-				operation = app.config["INSTANCES"].stop_instance(request.form["INSTANCE_ID"])
-			elif request.form["operation"] == "restart" :
-				operation = app.config["INSTANCES"].restart_instance(request.form["INSTANCE_ID"])
+            # Do the operation
+            if request.form["operation"] == "reload" :
+            	operation = app.config["INSTANCES"].reload_instance(request.form["INSTANCE_ID"])
+            elif request.form["operation"] == "start" :
+            	operation = app.config["INSTANCES"].start_instance(request.form["INSTANCE_ID"])
+            elif request.form["operation"] == "stop" :
+            	operation = app.config["INSTANCES"].stop_instance(request.form["INSTANCE_ID"])
+            elif request.form["operation"] == "restart" :
+            	operation = app.config["INSTANCES"].restart_instance(request.form["INSTANCE_ID"])
 
-		# Display instances
-		instances = app.config["INSTANCES"].get_instances()
-		return render_template("instances.html", title="Instances", instances=instances, operation=operation)
+        # Display instances
+        instances = app.config["INSTANCES"].get_instances()
+        return render_template("instances.html", title="Instances", instances=instances, operation=operation)
 
-	except Exception as e :
-		return render_template("error.html", title="Error", error=str(e) + "\n" + traceback.format_exc())
+    except Exception as e :
+    	return render_template("error.html", title="Error", error=str(e) + "\n" + traceback.format_exc())
 
 
 @app.route('/services', methods=["GET", "POST"])
 @login_required
 def services():
-	try :
-		# Manage services
-		operation = ""
-		if request.method == "POST" :
+    try:
+        # Manage services
+        operation = ""
+        if request.method == "POST":
 
-			# Check operation
-			if not "operation" in request.form or not request.form["operation"] in ["new", "edit", "delete"] :
-				raise Exception("Missing operation parameter on /services.")
+            			# Check operation
+            if "operation" not in request.form or request.form[
+                "operation"
+            ] not in ["new", "edit", "delete"]:
+                raise Exception("Missing operation parameter on /services.")
 
-			# Check variables
-			variables = copy.deepcopy(request.form.to_dict())
-			del variables["csrf_token"]
-			if not "OLD_SERVER_NAME" in request.form and request.form["operation"] == "edit" :
-					raise Exception("Missing OLD_SERVER_NAME parameter.")
-			if request.form["operation"] in ["new", "edit"] :
-				del variables["operation"]
-				if request.form["operation"] == "edit" :
-					del variables["OLD_SERVER_NAME"]
-				app.config["CONFIG"].check_variables(variables)
+            # Check variables
+            variables = copy.deepcopy(request.form.to_dict())
+            del variables["csrf_token"]
+            if (
+                "OLD_SERVER_NAME" not in request.form
+                and request.form["operation"] == "edit"
+            ):
+                raise Exception("Missing OLD_SERVER_NAME parameter.")
+            if request.form["operation"] in ["new", "edit"]:
+                del variables["operation"]
+                if request.form["operation"] == "edit" :
+                	del variables["OLD_SERVER_NAME"]
+                app.config["CONFIG"].check_variables(variables)
 
-			# Delete
-			elif request.form["operation"] == "delete" :
-				if not "SERVER_NAME" in request.form :
-					raise Exception("Missing SERVER_NAME parameter.")
-				app.config["CONFIG"].check_variables({"SERVER_NAME" : request.form["SERVER_NAME"]})
+            elif request.form["operation"] == "delete":
+                if "SERVER_NAME" not in request.form:
+                    raise Exception("Missing SERVER_NAME parameter.")
+                app.config["CONFIG"].check_variables({"SERVER_NAME" : request.form["SERVER_NAME"]})
 
-			# Do the operation
-			if request.form["operation"] == "new" :
-				operation = app.config["CONFIG"].new_service(variables)
-			elif request.form["operation"] == "edit" :
-				operation = app.config["CONFIG"].edit_service(request.form["OLD_SERVER_NAME"], variables)
-			elif request.form["operation"] == "delete" :
-				operation = app.config["CONFIG"].delete_service(request.form["SERVER_NAME"])
+            # Do the operation
+            if request.form["operation"] == "new" :
+            	operation = app.config["CONFIG"].new_service(variables)
+            elif request.form["operation"] == "edit" :
+            	operation = app.config["CONFIG"].edit_service(request.form["OLD_SERVER_NAME"], variables)
+            elif request.form["operation"] == "delete" :
+            	operation = app.config["CONFIG"].delete_service(request.form["SERVER_NAME"])
 
-			# Reload instances
-			reload = app.config["INSTANCES"].reload_instances()
-			if not reload :
-				operation = "Reload failed for at least one instance..."
+            # Reload instances
+            reload = app.config["INSTANCES"].reload_instances()
+            if not reload :
+            	operation = "Reload failed for at least one instance..."
 
-		# Display services
-		services = app.config["CONFIG"].get_services()
-		return render_template("services.html", title="Services", services=services, operation=operation)
+        # Display services
+        services = app.config["CONFIG"].get_services()
+        return render_template("services.html", title="Services", services=services, operation=operation)
 
-	except Exception as e :
-		return render_template("error.html", title="Error", error=str(e) + "\n" + traceback.format_exc())
+    except Exception as e :
+    	return render_template("error.html", title="Error", error=str(e) + "\n" + traceback.format_exc())

@@ -15,7 +15,7 @@ class DockerController(Controller.Controller) :
 	def __get_containers(self) :
 		return self.__client.containers.list(filters={"label" : "bunkerized-nginx.SERVER_NAME"})
 
-	def get_env(self) :
+	def get_env(self):
 		env = {}
 		for instance in self.__get_instances() :
 			for variable in instance.attrs["Config"]["Env"] :
@@ -23,23 +23,20 @@ class DockerController(Controller.Controller) :
 		first_servers = []
 		if "SERVER_NAME" in env and env["SERVER_NAME"] != "" :
 			first_servers = env["SERVER_NAME"].split(" ")
-		for container in self.__get_containers() :
+		for container in self.__get_containers():
 			first_server = container.labels["bunkerized-nginx.SERVER_NAME"].split(" ")[0]
 			first_servers.append(first_server)
-			for variable, value in container.labels.items() :
-				if variable.startswith("bunkerized-nginx.") and variable != "bunkerized-nginx.AUTOCONF" :
-					env[first_server + "_" + variable.replace("bunkerized-nginx.", "", 1)] = value
-		if len(first_servers) == 0 :
-			env["SERVER_NAME"] = ""
-		else :
-			env["SERVER_NAME"] = " ".join(first_servers)
+			for variable, value in container.labels.items():
+				if variable.startswith("bunkerized-nginx.") and variable != "bunkerized-nginx.AUTOCONF":
+					env[f"{first_server}_" + variable.replace("bunkerized-nginx.", "", 1)] = value
+		env["SERVER_NAME"] = "" if len(first_servers) == 0 else " ".join(first_servers)
 		return self._fix_env(env)
 
-	def process_events(self, current_env) :
+	def process_events(self, current_env):
 		old_env = current_env
 		# TODO : check why filter isn't working as expected
 		#for event in self.__client.events(decode=True, filters={"type": "container", "label": ["bunkerized-nginx.AUTOCONF", "bunkerized-nginx.SERVER_NAME"]}) :
-		for event in self.__client.events(decode=True, filters={"type": "container"}) :
+		for _ in self.__client.events(decode=True, filters={"type": "container"}):
 			new_env = self.get_env()
 			if new_env != old_env :
 				try :

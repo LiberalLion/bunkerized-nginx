@@ -21,78 +21,89 @@ class IngressController(Controller.Controller) :
 	def __get_ingresses(self) :
 		return self.__extensions_api.list_ingress_for_all_namespaces(watch=False, label_selector="bunkerized-nginx").items
 
-	def __get_services(self, autoconf=False) :
+	def __get_services(self, autoconf=False):
 		services = self.__api.list_service_for_all_namespaces(watch=False, label_selector="bunkerized-nginx").items
 		if not autoconf :
 			return services
-		services_autoconf = []
-		for service in services :
-			if service.metadata.annotations != None and "bunkerized-nginx.AUTOCONF" in service.metadata.annotations :
-				services_autoconf.append(service)
-		return services_autoconf
+		return [
+			service
+			for service in services
+			if service.metadata.annotations != None
+			and "bunkerized-nginx.AUTOCONF" in service.metadata.annotations
+		]
 
-	def __pod_to_env(self, pod_env) :
+	def __pod_to_env(self, pod_env):
 		env = {}
-		for env_var in pod_env :
+		for env_var in pod_env:
 			env[env_var.name] = env_var.value
-			if env_var.value == None :
+			if env_var.value is None:
 				env[env_var.name] = ""
 		return env
 
-	def __annotations_to_env(self, annotations) :
-		env = {}
+	def __annotations_to_env(self, annotations):
 		prefix = ""
 		if "bunkerized-nginx.SERVER_NAME" in annotations :
 			prefix = annotations["bunkerized-nginx.SERVER_NAME"].split(" ")[0] + "_"
-		for annotation in annotations :
-			if annotation.startswith("bunkerized-nginx.") and annotation.replace("bunkerized-nginx.", "", 1) != "" and annotation.replace("bunkerized-nginx.", "", 1) != "AUTOCONF" :
-				env[prefix + annotation.replace("bunkerized-nginx.", "", 1)] = annotations[annotation]
-		return env
+		return {
+			prefix
+			+ annotation.replace("bunkerized-nginx.", "", 1): annotations[annotation]
+			for annotation in annotations
+			if annotation.startswith("bunkerized-nginx.")
+			and annotation.replace("bunkerized-nginx.", "", 1) != ""
+			and annotation.replace("bunkerized-nginx.", "", 1) != "AUTOCONF"
+		}
 
-	def __rules_to_env(self, rules, namespace="default") :
+	def __rules_to_env(self, rules, namespace="default"):
 		env = {}
 		first_servers = []
 		numbers = {}
-		for rule in rules :
+		for rule in rules:
 			rule = rule.to_dict()
 			prefix = ""
 			number = 1
-			if "host" in rule :
+			if "host" in rule:
 				prefix = rule["host"] + "_"
 				first_servers.append(rule["host"])
-				if not rule["host"] in numbers :
+				if rule["host"] not in numbers:
 					numbers[rule["host"]] = 1
 				number = numbers[rule["host"]]
-			if not "http" in rule or not "paths" in rule["http"] :
+			if "http" not in rule or "paths" not in rule["http"]:
 				continue
-			env[prefix + "USE_REVERSE_PROXY"] = "yes"
-			for path in rule["http"]["paths"] :
-				suffix = "_" + str(number)
-				env[prefix + "REVERSE_PROXY_URL" + suffix] = path["path"]
-				env[prefix + "REVERSE_PROXY_HOST" + suffix] = "http://" + path["backend"]["service_name"] + "." + namespace + ".svc.cluster.local:" + str(path["backend"]["service_port"])
+			env[f"{prefix}USE_REVERSE_PROXY"] = "yes"
+			for path in rule["http"]["paths"]:
+				suffix = f"_{str(number)}"
+				env[f"{prefix}REVERSE_PROXY_URL{suffix}"] = path["path"]
+				env[f"{prefix}REVERSE_PROXY_HOST{suffix}"] = (
+					"http://"
+					+ path["backend"]["service_name"]
+					+ "."
+					+ namespace
+					+ ".svc.cluster.local:"
+					+ str(path["backend"]["service_port"])
+				)
 				number += 1
 			numbers[rule["host"]] = number
 		env["SERVER_NAME"] = " ".join(first_servers)
 		return env
 
-	def get_env(self) :
+	def get_env(self):
 		pods = self.__get_pods()
 		ingresses = self.__get_ingresses()
 		services = self.__get_services()
 		env = {}
 		first_servers = []
-		for pod in pods :
-			env.update(self.__pod_to_env(pod.spec.containers[0].env))
+		for pod in pods:
+			env |= self.__pod_to_env(pod.spec.containers[0].env)
 			if "SERVER_NAME" in env and env["SERVER_NAME"] != "" :
 				first_servers.extend(env["SERVER_NAME"].split(" "))
-		for ingress in ingresses :
+		for ingress in ingresses:
 			env.update(self.__rules_to_env(ingress.spec.rules, namespace=ingress.metadata.namespace))
 			if ingress.metadata.annotations != None :
 				env.update(self.__annotations_to_env(ingress.metadata.annotations))
-			if ingress.spec.tls :
-				for tls_entry in ingress.spec.tls :
-					for host in tls_entry.hosts :
-						env[host + "_AUTO_LETS_ENCRYPT"] = "yes"
+			if ingress.spec.tls:
+				for tls_entry in ingress.spec.tls:
+					for host in tls_entry.hosts:
+						env[f"{host}_AUTO_LETS_ENCRYPT"] = "yes"
 			if "SERVER_NAME" in env and env["SERVER_NAME"] != "" :
 				first_servers.extend(env["SERVER_NAME"].split(" "))
 		for service in services :
@@ -100,10 +111,7 @@ class IngressController(Controller.Controller) :
 				env.update(self.__annotations_to_env(service.metadata.annotations))
 				first_servers.append(service.metadata.annotations["bunkerized-nginx.SERVER_NAME"])
 		first_servers = list(dict.fromkeys(first_servers))
-		if len(first_servers) == 0 :
-			env["SERVER_NAME"] = ""
-		else :
-			env["SERVER_NAME"] = " ".join(first_servers)
+		env["SERVER_NAME"] = "" if not first_servers else " ".join(first_servers)
 		return self._fix_env(env)
 
 	def process_events(self, current_env) :
@@ -118,20 +126,20 @@ class IngressController(Controller.Controller) :
 		t_ingress.join()
 		t_service.join()
 
-	def __watch(self, type) :
+	def __watch(self, type):
 		w = watch.Watch()
 		what = None
-		if type == "pod" :
-			what = self.__api.list_pod_for_all_namespaces
-		elif type == "ingress" :
+		if type == "ingress":
 			what = self.__extensions_api.list_ingress_for_all_namespaces
-		elif type == "service" :
+		elif type == "pod":
+			what = self.__api.list_pod_for_all_namespaces
+		elif type == "service":
 			what = self.__api.list_service_for_all_namespaces
-		for event in w.stream(what, label_selector="bunkerized-nginx") :
+		for _ in w.stream(what, label_selector="bunkerized-nginx"):
 			self.lock.acquire()
 			new_env = self.get_env()
-			if new_env != self.__old_env :
-				try :
+			if new_env != self.__old_env:
+				try:
 					if not self.gen_conf(new_env) :
 						raise Exception("can't generate configuration")
 					if not self.send() :
@@ -140,8 +148,8 @@ class IngressController(Controller.Controller) :
 						raise Exception("can't reload configuration")
 					self.__old_env = new_env.copy()
 					log("CONTROLLER", "INFO", "successfully loaded new configuration")
-				except Exception as e :
-					log("controller", "ERROR", "error while computing new event : " + str(e))
+				except Exception as e:
+					log("controller", "ERROR", f"error while computing new event : {str(e)}")
 			self.lock.release()
 
 	def reload(self) :

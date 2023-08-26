@@ -4,15 +4,15 @@ from logger import log
 
 class ReloadServerHandler(socketserver.BaseRequestHandler):
 
-	def handle(self) :
+	def handle(self):
 		locked = False
-		try :
+		try:
 
-			while True :
+			while True:
 				data = self.request.recv(512)
-				if not data or not data in [b"lock", b"reload", b"unlock", b"acme"] :
+				if not data or data not in [b"lock", b"reload", b"unlock", b"acme"]:
 					break
-				if data == b"lock" :
+				if data == b"lock":
 					self.server.controller.lock.acquire()
 					locked = True
 					self.request.sendall(b"ok")
@@ -20,20 +20,18 @@ class ReloadServerHandler(socketserver.BaseRequestHandler):
 					self.server.controller.lock.release()
 					locked = False
 					self.request.sendall(b"ok")
-				elif data == b"acme" :
-					ret = self.server.controller.send(files="acme")
-					if ret :
+				elif data == b"acme":
+					if ret := self.server.controller.send(files="acme"):
 						self.request.sendall(b"ok")
-					else :
+					else:
 						self.request.sendall(b"ko")
-				elif data == b"reload" :
-					ret = self.server.controller.reload()
-					if ret :
+				elif data == b"reload":
+					if ret := self.server.controller.reload():
 						self.request.sendall(b"ok")
-					else :
+					else:
 						self.request.sendall(b"ko")
-		except Exception as e :
-			log("RELOADSERVER", "ERROR", "exception : " + str(e))
+		except Exception as e:
+			log("RELOADSERVER", "ERROR", f"exception : {str(e)}")
 		if locked :
 			self.server.controller.lock.release()
 

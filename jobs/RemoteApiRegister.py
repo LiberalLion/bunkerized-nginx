@@ -2,9 +2,9 @@ from Job import Job
 
 class RemoteApiRegister(Job) :
 
-	def __init__(self, server="", version="") :
+	def __init__(self, server="", version=""):
 		name = "remote-api-register"
-		data = [server + "/register"]
+		data = [f"{server}/register"]
 		filename = "machine.id"
 		type = "json"
 		regex = r"^[0-9a-f]{256}$"

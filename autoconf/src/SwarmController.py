@@ -17,7 +17,7 @@ class SwarmController(Controller.Controller) :
 	def __get_services(self) :
 		return self.__client.services.list(filters={"label" : "bunkerized-nginx.SERVER_NAME"})
 
-	def get_env(self) :
+	def get_env(self):
 		env = {}
 		for instance in self.__get_instances() :
 			for variable in instance.attrs["Spec"]["TaskTemplate"]["ContainerSpec"]["Env"] :
@@ -25,27 +25,24 @@ class SwarmController(Controller.Controller) :
 		first_servers = []
 		if "SERVER_NAME" in env and env["SERVER_NAME"] != "" :
 			first_servers = env["SERVER_NAME"].split(" ")
-		for service in self.__get_services() :
+		for service in self.__get_services():
 			first_server = service.attrs["Spec"]["Labels"]["bunkerized-nginx.SERVER_NAME"].split(" ")[0]
 			first_servers.append(first_server)
-			for variable, value in service.attrs["Spec"]["Labels"].items() :
-				if variable.startswith("bunkerized-nginx.") and variable != "bunkerized-nginx.AUTOCONF" :
-					env[first_server + "_" + variable.replace("bunkerized-nginx.", "", 1)] = value
-		if len(first_servers) == 0 :
-			env["SERVER_NAME"] = ""
-		else :
-			env["SERVER_NAME"] = " ".join(first_servers)
+			for variable, value in service.attrs["Spec"]["Labels"].items():
+				if variable.startswith("bunkerized-nginx.") and variable != "bunkerized-nginx.AUTOCONF":
+					env[f"{first_server}_" + variable.replace("bunkerized-nginx.", "", 1)] = value
+		env["SERVER_NAME"] = "" if len(first_servers) == 0 else " ".join(first_servers)
 		return self._fix_env(env)
 
-	def process_events(self, current_env) :
+	def process_events(self, current_env):
 		old_env = current_env
 		# TODO : check why filter isn't working as expected
 		#for event in self.__client.events(decode=True, filters={"type": "service", "label": ["bunkerized-nginx.AUTOCONF", "bunkerized-nginx.SERVER_NAME"]}) :
-		for event in self.__client.events(decode=True, filters={"type": "service"}) :
+		for _ in self.__client.events(decode=True, filters={"type": "service"}):
 			new_env = self.get_env()
-			if new_env != old_env :
+			if new_env != old_env:
 				self.lock.acquire()
-				try :
+				try:
 					if not self.gen_conf(new_env) :
 						raise Exception("can't generate configuration")
 					if not self.send() :
@@ -54,8 +51,8 @@ class SwarmController(Controller.Controller) :
 						raise Exception("can't reload configuration")
 					self.__old_env = new_env.copy()
 					log("CONTROLLER", "INFO", "successfully loaded new configuration")
-				except Exception as e :
-					log("controller", "ERROR", "error while computing new event : " + str(e))
+				except Exception as e:
+					log("controller", "ERROR", f"error while computing new event : {str(e)}")
 				self.lock.release()
 
 	def reload(self) :

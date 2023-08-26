@@ -13,12 +13,10 @@ class Abusers(Job) :
 		redis_ex = 86400
 		super().__init__(name, data, filename, redis_host=redis_host, redis_ex=redis_ex, type=type, regex=regex, copy_cache=copy_cache)
 
-	def _edit(self, chunk) :
-		if self._redis != None :
+	def _edit(self, chunk):
+		if self._redis != None:
 			network = chunk.decode("utf-8")
-			if re.match(network, r"^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\/?[0-9]+$") :
-				ips = []
-				for ip in ipaddress.IPv4Network(network) :
-					ips.append(str(ip).encode("utf-8"))
+			if re.match(network, r"^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\/?[0-9]+$"):
+				ips = [str(ip).encode("utf-8") for ip in ipaddress.IPv4Network(network)]
 		return [chunk]
 

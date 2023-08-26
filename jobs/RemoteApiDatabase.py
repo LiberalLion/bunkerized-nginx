@@ -2,9 +2,9 @@ from Job import Job
 
 class RemoteApiDatabase(Job) :
 
-	def __init__(self, server="", version="", id="", redis_host=None, copy_cache=False) :
+	def __init__(self, server="", version="", id="", redis_host=None, copy_cache=False):
 		name = "remote-api-database"
-		data = [server + "/db"]
+		data = [f"{server}/db"]
 		filename = "remote-api.db"
 		type = "json"
 		redis_ex = 3600

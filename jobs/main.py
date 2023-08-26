@@ -24,7 +24,7 @@ JOBS = {
 
 }
 
-if __name__ == "__main__" :
+if __name__ == "__main__":
 
 	# Parse arguments
 	parser = argparse.ArgumentParser(description="job runner for bunkerized-nginx")
@@ -45,8 +45,8 @@ if __name__ == "__main__" :
 	args = parser.parse_args()
 
 	# Check job name
-	if not args.name in JOBS :
-		log("job", "ERROR", "unknown job " + args.name)
+	if args.name not in JOBS:
+		log("job", "ERROR", f"unknown job {args.name}")
 		sys.exit(1)
 	job = args.name
 
@@ -57,51 +57,58 @@ if __name__ == "__main__" :
 
 	# Check if we are using redis or not
 	redis_host = None
-	try :
+	try:
 		with open("/etc/nginx/global.env", "r") as f :
 			data = f.read()
-		if re.search(r"^USE_REDIS=yes$", data, re.MULTILINE) :
-			re_match = re.search(r"^REDIS_HOST=(.+)$", data, re.MULTILINE)
-			if re_match :
+		if re.search(r"^USE_REDIS=yes$", data, re.MULTILINE):
+			if re_match := re.search(r"^REDIS_HOST=(.+)$", data, re.MULTILINE):
 				redis_host = re_match.group(1)
 	except :
 		log("job", "ERROR", "can't check if redis is used")
 
 	# Run job
-	log("job", "INFO", "executing job " + job)
+	log("job", "INFO", f"executing job {job}")
 	ret = 0
-	if job == "certbot-new" :
+	if job == "certbot-new":
 		instance = JOBS[job](redis_host=redis_host, copy_cache=args.cache, domain=args.domain, email=args.email, staging=args.staging)
-	elif job == "self-signed-cert" :
-		instance = JOBS[job](redis_host=redis_host, copy_cache=args.cache, dst_cert=args.dst_cert, dst_key=args.dst_key, expiry=args.expiry, subj=args.subj)
-	elif job == "remote-api-database" :
+	elif job == "remote-api-database":
 		instance = JOBS[job](server=args.server, version=args.version, id=args.id, redis_host=redis_host, copy_cache=args.cache)
-	elif job == "remote-api-register" :
+	elif job == "remote-api-register":
 		instance = JOBS[job](server=args.server, version=args.version)
-	else :
+	elif job == "self-signed-cert":
+		instance = JOBS[job](redis_host=redis_host, copy_cache=args.cache, dst_cert=args.dst_cert, dst_key=args.dst_key, expiry=args.expiry, subj=args.subj)
+	else:
 		instance = JOBS[job](redis_host=redis_host, copy_cache=args.cache)
 	ret = instance.run()
-	if ret == JobRet.KO :
-		log("job", "ERROR", "error while running job " + job)
+	if ret == JobRet.KO:
+		log("job", "ERROR", f"error while running job {job}")
 		if args.lock :
 			management.unlock()
 		sys.exit(1)
-	log("job", "INFO", "job " + job + " successfully executed")
+	log("job", "INFO", f"job {job} successfully executed")
 
 	# Reload
-	if ret == JobRet.OK_RELOAD and args.reload :
+	if ret == JobRet.OK_RELOAD and args.reload:
 		ret = management.reload()
-		if ret == ReloadRet.KO :
-			log("job", "ERROR", "error while doing reload operation (job = " + job + ")")
+		if ret == ReloadRet.KO:
+			log("job", "ERROR", f"error while doing reload operation (job = {job})")
 			if args.lock :
 				management.unlock()
 			sys.exit(1)
-		elif ret == ReloadRet.OK :
-			log("job", "INFO", "reload operation successfully executed (job = " + job + ")")
-		elif ret == ReloadRet.NO :
-			log("job", "INFO", "skipped reload operation because nginx is not running (job = " + job + ")")
-	else :
-		log("job", "INFO", "skipped reload operation because it's not needed (job = " + job + ")")
+		elif ret == ReloadRet.OK:
+			log("job", "INFO", f"reload operation successfully executed (job = {job})")
+		elif ret == ReloadRet.NO:
+			log(
+				"job",
+				"INFO",
+				f"skipped reload operation because nginx is not running (job = {job})",
+			)
+	else:
+		log(
+			"job",
+			"INFO",
+			f"skipped reload operation because it's not needed (job = {job})",
+		)
 
 	# Release the lock
 	if args.lock :

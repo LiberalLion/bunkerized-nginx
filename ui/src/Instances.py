@@ -9,16 +9,10 @@ class Instances :
 			self.__docker = None
 		self.__api_uri = api_uri
 
-	def __instance(self, id, name, type, status, data=None) :
-		instance = {}
-		instance["id"]		= id
-		instance["name"]	= name
-		instance["type"]	= type
-		instance["status"]	= status
-		instance["data"]	= data
-		return instance
+	def __instance(self, id, name, type, status, data=None):
+		return {"id": id, "name": name, "type": type, "status": status, "data": data}
 
-	def __api_request(self, instance, order) :
+	def __api_request(self, instance, order):
 		result = True
 		hosts = []
 		if instance["type"] == "container" :
@@ -27,27 +21,27 @@ class Instances :
 			for task in instance["data"].tasks() :
 				host = instance["name"] + "." + task["NodeID"] + "." + task["ID"]
 				hosts.append(host)
-		for host in hosts :
-			try :
-				req = requests.post("http://" + host + ":8080" + self.__api_uri + order)
+		for host in hosts:
+			try:
+				req = requests.post(f"http://{host}:8080{self.__api_uri}{order}")
 				if not req or req.status_code != 200 or req.text != "ok" :
 					result = False
 			except :
 				result = False
 		return result
 
-	def __instance_from_id(self, id) :
+	def __instance_from_id(self, id):
 		instances = self.get_instances()
 		for instance in instances :
 			if instance["id"] == id :
 				return instance
-		raise Exception("Can't find instance with id " + id)
+		raise Exception(f"Can't find instance with id {id}")
 
-	def get_instances(self) :
+	def get_instances(self):
 		instances = []
 
 		# Docker instances (containers or services)
-		if self.__docker != None :
+		if self.__docker != None:
 			for instance in self.__docker.containers.list(all=True, filters={"label" : "bunkerized-nginx.UI"}) :
 				id = instance.id
 				name = instance.name
@@ -61,11 +55,11 @@ class Instances :
 				version = self.__docker.swarm.version
 			except :
 				is_swarm = False
-			if is_swarm :
-				for instance in self.__docker.services.list(filters={"label" : "bunkerized-nginx.UI"}) :
+			if is_swarm:
+				type = "service"
+				for instance in self.__docker.services.list(filters={"label" : "bunkerized-nginx.UI"}):
 					id = instance.id
 					name = instance.name
-					type = "service"
 					status = "down"
 					desired_tasks = instance.attrs["ServiceStatus"]["DesiredTasks"]
 					running_tasks = instance.attrs["ServiceStatus"]["RunningTasks"]
@@ -74,24 +68,21 @@ class Instances :
 					instances.append(self.__instance(id, name, type, status, instance))
 
 		# Local instance
-		if os.path.exists("/usr/sbin/nginx") :
+		if os.path.exists("/usr/sbin/nginx"):
 			id = "local"
 			name = "local"
-			type = "local"
-			status = "down"
-			if os.path.exists("/tmp/nginx.pid") :
-				status = "up"
-			instances.append(self.__instance(id, name, type, status))
+			status = "up" if os.path.exists("/tmp/nginx.pid") else "down"
+			instances.append(self.__instance(id, name, "local", status))
 
 		return instances
 
-	def reload_instances(self) :
+	def reload_instances(self):
 		all_reload = True
-		for instance in self.get_instances() :
+		for instance in self.get_instances():
 			if instance["status"] == "down" :
 				all_reload = False
 				continue
-			if instance["type"] == "local" :
+			if instance["type"] == "local":
 				proc = subprocess.run(["/opt/bunkerized-nginx/entrypoint/jobs.sh"], capture_output=True)
 				if proc.returncode != 0 :
 					all_reload = False
@@ -99,57 +90,57 @@ class Instances :
 					proc = subprocess.run(["sudo", "/opt/bunkerized-nginx/ui/linux.sh", "reload"], capture_output=True)
 					if proc.returncode != 0 :
 						all_reload = False
-			elif instance["type"] == "container" or instance["type"] == "service" :
+			elif instance["type"] in ["container", "service"]:
 				all_reload = self.__api_request(instance, "/reload")
 		return all_reload
 
-	def reload_instance(self, id) :
+	def reload_instance(self, id):
 		instance = self.__instance_from_id(id)
 		result = True
-		if instance["type"] == "local" :
+		if instance["type"] == "local":
 			proc = subprocess.run(["/opt/bunkerized-nginx/entrypoint/jobs.sh"], capture_output=True)
 			if proc.returncode != 0 :
 				result = False
 			else :
 				proc = subprocess.run(["sudo", "/opt/bunkerized-nginx/ui/linux.sh", "reload"], capture_output=True)
 				result = proc.returncode == 0
-		elif instance["type"] == "container" or instance["type"] == "service" :
+		elif instance["type"] in ["container", "service"]:
 			result = self.__api_request(instance, "/reload")
 		if result :
 			return "Instance " + instance["name"] + " has been reloaded."
 		return "Can't reload " + instance["name"]
 
-	def start_instance(self, id) :
+	def start_instance(self, id):
 		instance = self.__instance_from_id(id)
 		result = True
-		if instance["type"] == "local" :
+		if instance["type"] == "local":
 			proc = subprocess.run(["sudo", "/opt/bunkerized-nginx/ui/linux.sh", "start"], capture_output=True)
 			result = proc.returncode == 0
-		elif instance["type"] == "container" or instance["type"] == "service" :
+		elif instance["type"] in ["container", "service"]:
 			result = False #self.__api_request(instance, "/start")
 		if result :
 			return "Instance " + instance["name"] + " has been started."
 		return "Can't start " + instance["name"]
 
-	def stop_instance(self, id) :
+	def stop_instance(self, id):
 		instance = self.__instance_from_id(id)
 		result = True
-		if instance["type"] == "local" :
+		if instance["type"] == "local":
 			proc = subprocess.run(["sudo", "/opt/bunkerized-nginx/ui/linux.sh", "stop"], capture_output=True)
 			result = proc.returncode == 0
-		elif instance["type"] == "container" or instance["type"] == "service" :
+		elif instance["type"] in ["container", "service"]:
 			result = self.__api_request(instance, "/stop")
 		if result :
 			return "Instance " + instance["name"] + " has been stopped."
 		return "Can't stop " + instance["name"]
 
-	def restart_instance(self, id) :
+	def restart_instance(self, id):
 		instance = self.__instance_from_id(id)
 		result = True
-		if instance["type"] == "local" :
+		if instance["type"] == "local":
 			proc = subprocess.run(["sudo", "/opt/bunkerized-nginx/ui/linux.sh", "restart"], capture_output=True)
 			result = proc.returncode == 0
-		elif instance["type"] == "container" or instance["type"] == "service" :
+		elif instance["type"] in ["container", "service"]:
 			result = False #self.__api_request(instance, "/restart")
 		if result :
 			return "Instance " + instance["name"] + " has been restarted."
